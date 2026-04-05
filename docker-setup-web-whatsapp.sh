@@ -6,9 +6,9 @@ SETUP_SCRIPT="$ROOT_DIR/scripts/docker/setup.sh"
 
 HOST_ROOT="${OPENCLAW_HOST_ROOT:-$HOME/Documents/OpenClaw}"
 CONFIG_DIR="$HOST_ROOT/.openclaw"
-WORKSPACE_DIR="${OPENCLAW_WORKSPACE_ROOT:-$HOST_ROOT/workspace}"
+WORKSPACE_DIR="${OPENCLAW_WORKSPACE_DIR:-${OPENCLAW_WORKSPACE_ROOT:-$HOST_ROOT/workspace}}"
 HOME_BIND_DIR="$CONFIG_DIR/home"
-PLAYWRIGHT_CACHE="${PLAYWRIGHT_BROWSERS_PATH:-/home/node/.openclaw/.playwright-cache}"
+PLAYWRIGHT_CACHE="${PLAYWRIGHT_BROWSERS_PATH:-/home/node/.cache/ms-playwright}"
 
 fail() {
   echo "ERROR: $*" >&2
@@ -73,9 +73,19 @@ export OPENCLAW_WORKSPACE_DIR="$WORKSPACE_DIR"
 export OPENCLAW_HOME_VOLUME="$HOME_BIND_DIR"
 export OPENCLAW_GATEWAY_BIND="${OPENCLAW_GATEWAY_BIND:-lan}"
 export OPENCLAW_DOCKER_APT_PACKAGES="${OPENCLAW_DOCKER_APT_PACKAGES:-git curl jq}"
-export OPENCLAW_BUNDLED_PLUGINS_DIR="${OPENCLAW_BUNDLED_PLUGINS_DIR:-/app/dist/extensions}"
+export OPENCLAW_BUNDLED_PLUGINS_DIR="${OPENCLAW_BUNDLED_PLUGINS_DIR:-/app/extensions}"
 export PLAYWRIGHT_BROWSERS_PATH="$PLAYWRIGHT_CACHE"
 export OPENCLAW_EXTRA_MOUNTS=""
+
+CONTROL_UI_URL="http://127.0.0.1:18789/"
+if [[ "$OPENCLAW_GATEWAY_BIND" == "lan" ]]; then
+  HOST_LAN_IP="$( (hostname -I 2>/dev/null || true) | awk '{print $1}' )"
+  if [[ -n "$HOST_LAN_IP" ]]; then
+    CONTROL_UI_URL="http://$HOST_LAN_IP:18789/"
+  else
+    CONTROL_UI_URL="http://<host-lan-ip>:18789/"
+  fi
+fi
 
 echo "OpenClaw Docker profile"
 echo "  Host root: $HOST_ROOT"
@@ -113,6 +123,9 @@ fi
 
 echo ""
 echo "Setup complete."
-echo "Open the Control UI at http://127.0.0.1:18789/"
+echo "Open the Control UI at $CONTROL_UI_URL"
+if [[ "$OPENCLAW_GATEWAY_BIND" == "lan" && "$CONTROL_UI_URL" == "http://<host-lan-ip>:18789/" ]]; then
+  echo "OPENCLAW_GATEWAY_BIND=lan, so use your host LAN IP if auto-detection failed."
+fi
 echo "If you skipped WhatsApp linking, run:"
 echo "  docker compose ${COMPOSE_ARGS[*]} run --rm openclaw-cli channels login --channel whatsapp"

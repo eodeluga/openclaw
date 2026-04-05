@@ -4,10 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOST_ROOT="${OPENCLAW_HOST_ROOT:-$HOME/Documents/OpenClaw}"
 CONFIG_DIR="$HOST_ROOT/.openclaw"
-WORKSPACE_DIR="${OPENCLAW_WORKSPACE_ROOT:-$HOST_ROOT/workspace}"
+WORKSPACE_DIR="${OPENCLAW_WORKSPACE_DIR:-${OPENCLAW_WORKSPACE_ROOT:-$HOST_ROOT/workspace}}"
 HOME_BIND_DIR="$CONFIG_DIR/home"
-
-sudo -v
 
 fail() {
   echo "ERROR: $*" >&2
@@ -17,6 +15,14 @@ fail() {
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
     fail "Missing dependency: $1"
+  fi
+}
+
+validate_no_whitespace() {
+  local label="$1"
+  local value="$2"
+  if [[ "$value" =~ [[:space:]] ]]; then
+    fail "$label cannot contain whitespace: $value"
   fi
 }
 
@@ -32,6 +38,10 @@ if ! docker compose version >/dev/null 2>&1; then
   fail "Docker Compose v2 is required."
 fi
 
+validate_no_whitespace "OPENCLAW_HOST_ROOT" "$HOST_ROOT"
+validate_no_whitespace "CONFIG_DIR" "$CONFIG_DIR"
+validate_no_whitespace "HOME_BIND_DIR" "$HOME_BIND_DIR"
+
 export OPENCLAW_CONFIG_DIR="$CONFIG_DIR"
 export OPENCLAW_WORKSPACE_DIR="$WORKSPACE_DIR"
 export OPENCLAW_HOME_VOLUME="$HOME_BIND_DIR"
@@ -41,7 +51,7 @@ append_compose_file_if_present "$ROOT_DIR/docker-compose.extra.yml"
 append_compose_file_if_present "$ROOT_DIR/docker-compose.sandbox.yml"
 
 echo "Stopping OpenClaw Docker services for $HOST_ROOT"
-RUNNING=$(docker container ls --filter name=openclaw --quiet)
+RUNNING=$(docker compose "${COMPOSE_ARGS[@]}" ps --quiet)
 if [[ -n "$RUNNING" ]]; then
   docker container stop $RUNNING
 fi
@@ -53,9 +63,10 @@ if [[ "${OPENCLAW_REMOVE_HOME_BIND_DIR:-0}" == "1" ]]; then
 fi
 
 if [ -d "${HOST_ROOT}" ]; then
+  sudo -v
   echo "Removing persisted data at:"
   echo "  $HOST_ROOT"
-  sudo rm -rf $HOST_ROOT
+  sudo rm -rf "$HOST_ROOT"
 fi
 
 echo "Teardown complete."
