@@ -42,6 +42,7 @@ RUN mkdir -p /out && \
 # ── Stage 2: Build ──────────────────────────────────────────────
 FROM ${OPENCLAW_NODE_BOOKWORM_IMAGE} AS build
 ARG OPENCLAW_BUNDLED_PLUGIN_DIR
+ARG OPENCLAW_INSTALL_BROWSER
 
 # Install Bun (required for build scripts). Retry the whole bootstrap flow to
 # tolerate transient 5xx failures from bun.sh/GitHub during CI image builds.
@@ -72,6 +73,13 @@ COPY --from=ext-deps /out/ ./${OPENCLAW_BUNDLED_PLUGIN_DIR}/
 # Docker builds on small VMs may otherwise fail with "Killed" (exit 137).
 RUN --mount=type=cache,id=openclaw-pnpm-store,target=/root/.local/share/pnpm/store,sharing=locked \
     NODE_OPTIONS=--max-old-space-size=2048 pnpm install --frozen-lockfile
+
+# When browser automation is enabled, make the Playwright Node package available
+# in the runtime image without mutating package.json/lockfiles in the source tree.
+RUN --mount=type=cache,id=openclaw-pnpm-store,target=/root/.local/share/pnpm/store,sharing=locked \
+    if [ -n "$OPENCLAW_INSTALL_BROWSER" ]; then \
+      npm install --no-save playwright@1.59.1; \
+    fi
 
 COPY . .
 
@@ -141,12 +149,14 @@ WORKDIR /app
 RUN --mount=type=cache,id=openclaw-bookworm-apt-cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=openclaw-bookworm-apt-lists,target=/var/lib/apt,sharing=locked \
     apt-get update && \
+    apt-get install -y \
+      python3.11-venv \
+      python3.11-dev && \
     if [ "${OPENCLAW_DOCKER_APT_UPGRADE}" != "0" ]; then \
       DEBIAN_FRONTEND=noninteractive apt-get upgrade -y --no-install-recommends; \
     fi && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
       procps hostname curl git lsof openssl
-
 RUN chown node:node /app
 
 COPY --from=runtime-assets --chown=node:node /app/dist ./dist
@@ -178,6 +188,15 @@ RUN install -d -m 0755 "$COREPACK_HOME" && \
     done && \
     chmod -R a+rX "$COREPACK_HOME"
 
+# Install Homebrew package manager
+ENV HOMEBREW_PREFIX=/home/linuxbrew/.linuxbrew
+ENV PATH="${HOMEBREW_PREFIX}/bin:${HOMEBREW_PREFIX}/sbin:${PATH}"
+RUN --mount=type=cache,id=openclaw-homebrew-cache,target=/home/node/.cache/Homebrew,uid=1000,gid=1000,sharing=locked \
+    install -d -m 0755 /home/linuxbrew/.linuxbrew && \
+    chown -R node:node /home/linuxbrew && \
+    su -s /bin/bash node -c 'NONINTERACTIVE=1 CI=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"' && \
+    su -s /bin/bash node -c 'brew --version'
+
 # Install additional system packages needed by your skills or extensions.
 # Example: docker build --build-arg OPENCLAW_DOCKER_APT_PACKAGES="python3 wget" .
 ARG OPENCLAW_DOCKER_APT_PACKAGES=""
@@ -202,6 +221,19 @@ RUN --mount=type=cache,id=openclaw-bookworm-apt-cache,target=/var/cache/apt,shar
       PLAYWRIGHT_BROWSERS_PATH=/home/node/.cache/ms-playwright \
       node /app/node_modules/playwright-core/cli.js install --with-deps chromium && \
       chown -R node:node /home/node/.cache/ms-playwright; \
+    fi
+
+# Optional helper packages for job-hunt style browser automation and document work.
+# Build with for example:
+#   docker build --build-arg OPENCLAW_INSTALL_JOB_HUNT_DEPS=1 --build-arg OPENCLAW_INSTALL_BROWSER=1 ...
+# Installs SQLite CLI plus PDF/text utilities commonly useful for CV tailoring pipelines.
+ARG OPENCLAW_INSTALL_JOB_HUNT_DEPS=""
+RUN --mount=type=cache,id=openclaw-bookworm-apt-cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=openclaw-bookworm-apt-lists,target=/var/lib/apt,sharing=locked \
+    if [ -n "$OPENCLAW_INSTALL_JOB_HUNT_DEPS" ]; then \
+      apt-get update && \
+      DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        sqlite3 poppler-utils pandoc wkhtmltopdf; \
     fi
 
 # Optionally install Docker CLI for sandbox container management.

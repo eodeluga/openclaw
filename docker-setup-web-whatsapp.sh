@@ -4,8 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SETUP_SCRIPT="$ROOT_DIR/scripts/docker/setup.sh"
 
-HOST_ROOT="${OPENCLAW_HOST_ROOT:-$HOME/Documents/OpenClaw}"
-CONFIG_DIR="$HOST_ROOT/.openclaw"
+HOST_ROOT="${OPENCLAW_HOST_ROOT:-$HOME/openclaw}"
+CONFIG_DIR="$HOST_ROOT/.config"
 WORKSPACE_DIR="${OPENCLAW_WORKSPACE_DIR:-${OPENCLAW_WORKSPACE_ROOT:-$HOST_ROOT/workspace}}"
 HOME_BIND_DIR="$CONFIG_DIR/home"
 PLAYWRIGHT_CACHE="${PLAYWRIGHT_BROWSERS_PATH:-/home/node/.cache/ms-playwright}"

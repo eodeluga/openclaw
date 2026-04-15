@@ -1,10 +1,16 @@
 services:
   openclaw-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        OPENCLAW_INSTALL_BROWSER: ${OPENCLAW_INSTALL_BROWSER:-1}
     image: ${OPENCLAW_IMAGE:-openclaw:local}
     user: '${OPENCLAW_UID:-1000}:${OPENCLAW_GID:-1000}'
     environment:
       HOME: /home/node
       TERM: xterm-256color
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
       OPENCLAW_ALLOW_INSECURE_PRIVATE_WS: ${OPENCLAW_ALLOW_INSECURE_PRIVATE_WS:-}
       OPENCLAW_BUNDLED_PLUGINS_DIR: ${OPENCLAW_BUNDLED_PLUGINS_DIR:-/app/extensions}
@@ -13,9 +19,12 @@ services:
       CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY:-}
       CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE:-}
       TZ: ${OPENCLAW_TZ:-UTC}
+    networks:
+      gsqs-host-access: {}
     volumes:
-      - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw
-      - ${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclaw/workspace
+      - ${OPENCLAW_CONFIG_DIR:-$HOME/openclaw/.config}:/home/node/.openclaw
+      - ${OPENCLAW_WORKSPACE_DIR:-$HOME/openclaw/workspace}:/home/node/.openclaw/workspace
+      - ${OPENCLAW_PROJECTS_DIR:-$HOME/openclaw/workspace/projects}:/home/node/.openclaw/workspace/projects
       ## Uncomment the lines below to enable sandbox isolation
       ## (agents.defaults.sandbox). Requires Docker CLI in the image
       ## (build with --build-arg OPENCLAW_INSTALL_DOCKER_CLI=1) or use
@@ -82,3 +91,7 @@ services:
     entrypoint: ['node', 'dist/index.js']
     depends_on:
       - openclaw-gateway
+networks:
+  gsqs-host-access:
+    external: true
+    name: gsqs-host-access
