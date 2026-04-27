@@ -3,8 +3,9 @@
 # Opt-in extension dependencies at build time (space-separated directory names).
 # Example: docker build --build-arg OPENCLAW_EXTENSIONS="diagnostics-otel matrix" .
 #
-# Multi-stage build produces a minimal runtime image without build tools,
-# source code, or Bun. Works with Docker, Buildx, and Podman.
+# Multi-stage build produces a minimal runtime image without build tools
+# or source code while still exposing Bun for container-local workflows.
+# Works with Docker, Buildx, and Podman.
 # The ext-deps stage extracts only the package.json files we need from the
 # bundled plugin workspace tree, so the main build layer is not invalidated by
 # unrelated plugin source changes.
@@ -166,10 +167,12 @@ COPY --from=runtime-assets --chown=node:node /app/openclaw.mjs .
 COPY --from=runtime-assets --chown=node:node /app/${OPENCLAW_BUNDLED_PLUGIN_DIR} ./${OPENCLAW_BUNDLED_PLUGIN_DIR}
 COPY --from=runtime-assets --chown=node:node /app/skills ./skills
 COPY --from=runtime-assets --chown=node:node /app/docs ./docs
+COPY --from=build --chown=node:node /root/.bun /home/node/.bun
 
 # In npm-installed Docker images, prefer the copied source extension tree for
 # bundled discovery so package metadata that points at source entries stays valid.
 ENV OPENCLAW_BUNDLED_PLUGINS_DIR=/app/${OPENCLAW_BUNDLED_PLUGIN_DIR}
+ENV PATH="/home/node/.bun/bin:${PATH}"
 
 # Keep pnpm available in the runtime image for container-local workflows.
 # Use a shared Corepack home so the non-root `node` user does not need a

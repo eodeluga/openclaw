@@ -21,6 +21,8 @@ services:
       TZ: ${OPENCLAW_TZ:-UTC}
     networks:
       gsqs-host-access: {}
+      browser-rc-access: {}
+
     volumes:
       - ${OPENCLAW_CONFIG_DIR:-$HOME/openclaw/.config}:/home/node/.openclaw
       - ${OPENCLAW_WORKSPACE_DIR:-$HOME/openclaw/workspace}:/home/node/.openclaw/workspace
@@ -95,3 +97,6 @@ networks:
   gsqs-host-access:
     external: true
     name: gsqs-host-access
+  browser-rc-access:
+    external: true
+    name: browser-rc-access
